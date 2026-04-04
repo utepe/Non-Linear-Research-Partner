@@ -129,14 +129,4 @@ The prototype was designed against 15 user requirements derived from our researc
 
 ## Research Paper
 
-The accompanying research paper (LaTeX) is in the sibling directory:
-
-```
-../CSE593_HCI_Winter_2026_Group_Project_Document_Group10/assignment_draft.tex
-```
-
-Build with:
-```bash
-cd ../CSE593_HCI_Winter_2026_Group_Project_Document_Group10
-latexmk -pdf assignment_draft.tex
-```
+<!-- TODO: Add link to research paper once available -->
