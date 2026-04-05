@@ -3,7 +3,10 @@
     "allow": [
       "Bash(/usr/local/bin/npm install:*)",
       "Read(//opt/homebrew/bin/**)",
-      "Read(//Users/utepe/.nvm/versions/**)"
+      "Read(//Users/utepe/.nvm/versions/**)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }
