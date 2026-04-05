@@ -1,6 +1,7 @@
 import { MessageSquare, FileText, Upload, CheckSquare, BookMarked } from 'lucide-react'
 import { useStore } from '../store'
 import { summarizePdf } from '../services/ai'
+import { extractPdfText } from '../services/pdfExtract'
 
 interface SidebarBtn {
   icon: React.ReactNode
@@ -11,7 +12,7 @@ interface SidebarBtn {
 
 export default function Sidebar() {
   const addWindow = useStore(s => s.addWindow)
-  const windows = useStore(s => s.windows)
+  const windows   = useStore(s => s.windows)
 
   const handlePdfUpload = () => {
     const input = document.createElement('input')
@@ -22,34 +23,50 @@ export default function Sidebar() {
       if (!file) return
 
       const wid = addWindow('pdf', { pdfName: file.name, pdfLoading: true })
+      const { apiKey, chatModel, updateWindow } = useStore.getState()
 
-      const apiKey = useStore.getState().apiKey
-      if (!apiKey) {
-        useStore.getState().updateWindow(wid, {
+      // Extract text from the PDF client-side first
+      let pdfText = ''
+      try {
+        const buffer = await file.arrayBuffer()
+        pdfText = await extractPdfText(buffer)
+        updateWindow(wid, { pdfText })
+      } catch (err) {
+        updateWindow(wid, {
           pdfLoading: false,
-          pdfSummary: 'Add an Anthropic API key in Settings to auto-summarize PDFs.',
+          pdfSummary: `⚠️ Could not read PDF: ${(err as Error).message}`,
         })
         return
       }
 
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1]
-        useStore.getState().updateWindow(wid, { pdfBase64: base64 })
-        try {
-          let summary = ''
-          await summarizePdf(base64, apiKey, (chunk) => {
-            summary += chunk
-            useStore.getState().updateWindow(wid, { pdfSummary: summary })
-          })
-          useStore.getState().updateWindow(wid, { pdfLoading: false })
-        } catch (err) {
-          useStore.getState().updateWindow(wid, {
-            pdfSummary: `Error generating summary: ${(err as Error).message}`,
-            pdfLoading: false,
-          })
-        }
+      if (!pdfText.trim()) {
+        updateWindow(wid, {
+          pdfLoading: false,
+          pdfSummary: '⚠️ No readable text found in this PDF. It may be a scanned image without OCR.',
+        })
+        return
+      }
+
+      if (!apiKey) {
+        updateWindow(wid, {
+          pdfLoading: false,
+          pdfSummary: 'Add an OpenRouter API key in ⚙ Settings to auto-summarize PDFs.',
+        })
+        return
+      }
+
+      try {
+        let summary = ''
+        await summarizePdf(pdfText, file.name, apiKey, chatModel, chunk => {
+          summary += chunk
+          useStore.getState().updateWindow(wid, { pdfSummary: summary })
+        })
+        useStore.getState().updateWindow(wid, { pdfLoading: false })
+      } catch (err) {
+        useStore.getState().updateWindow(wid, {
+          pdfSummary: `⚠️ Error generating summary: ${(err as Error).message}`,
+          pdfLoading: false,
+        })
       }
     }
     input.click()
@@ -91,7 +108,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <div className="w-14 h-full bg-white border-r border-gray-200 flex flex-col items-center py-3 gap-1 shrink-0 shadow-sm z-10">
+    <div className="w-14 h-full bg-white border-r border-gray-200 flex flex-col items-center py-3 gap-1 shrink-0 shadow-sm z-[9999]">
       {/* Logo */}
       <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center mb-3 shadow-sm">
         <span className="text-white text-xs font-bold">NR</span>
@@ -109,7 +126,7 @@ export default function Sidebar() {
             {btn.icon}
           </button>
           {/* Tooltip */}
-          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[999999]">
             {btn.label}
           </div>
         </div>
