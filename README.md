@@ -41,9 +41,10 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ## First-time use
 
 1. **Sign in** — enter your name and a project title (no account needed; data is local)
-2. **Set your API key** — click the ⚙ gear icon (top-right) and paste an Anthropic API key (`sk-ant-…`) to enable AI features
-3. **Set project requirements** — click "Set requirements" in the top bar to define constraints that apply to every AI interaction automatically (e.g. citation format, audience, scope)
-4. **Add windows** — use the left sidebar to add chats, notes, PDFs, and more
+2. **Get a free API key** — sign up at [openrouter.ai](https://openrouter.ai) and create a free API key (no credit card required for free models)
+3. **Set your API key** — click the ⚙ gear icon (top-right), paste your OpenRouter key, and select models for chat and the response auditor
+4. **Set project requirements** — click "Set requirements" in the top bar to define constraints that apply to every AI interaction automatically (e.g. citation format, audience, scope)
+5. **Add windows** — use the left sidebar to add chats, notes, PDFs, and more
 
 ---
 
@@ -56,10 +57,12 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - All window positions and content persist across page reloads (localStorage)
 
 ### Chat Windows
-- Streaming AI responses via the Anthropic API (claude-opus-4-6)
+- Streaming AI responses via OpenRouter (access to 100+ free models)
+- Responses rendered as formatted markdown — bold, lists, headings, code blocks, and clickable links
 - Project requirements automatically applied to every message — no need to repeat yourself
+- **Retry** — re-run any failed or unsatisfactory response with one click
 - **Save to Notes** — copies any AI response directly into a notes window
-- **Audit Response** — opens a Response Auditor that runs an independent evaluation of the AI's answer
+- **Audit Response** — opens a Response Auditor that runs an independent evaluation using a separate model
 - **Edit Response** — click the pencil icon to correct or annotate any AI message in place
 
 ### Notes Windows
@@ -70,9 +73,9 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### PDF Upload & Summarization
 - Upload any PDF from your file system
-- Automatically summarized by Claude using the document API
-- Ask questions about the PDF — opens a new pre-seeded chat window
-- Regenerate summary at any time
+- Text is extracted client-side via PDF.js — works with any text-only free model
+- Automatically summarized on upload; regenerate at any time or swap the file
+- Ask questions about the PDF — opens a new pre-seeded chat window with the summary as context
 
 ### Checklist
 - Track research tasks with checkboxes
@@ -86,8 +89,9 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Response Auditor
 - Triggered from any AI message via the "Audit" button
-- Runs a second independent Claude call to evaluate: factual accuracy, completeness, confidence level, and what to verify independently
-- Addresses the trust and verification requirements identified in our user research
+- Uses a **separate, independently-configured model** (not the same one that wrote the response) for a genuinely independent evaluation
+- Evaluates: factual accuracy, completeness, confidence level, and what to verify independently
+- The evaluated model name is shown in the auditor window header
 
 ### Project Requirements
 - Defined once per session in the top bar
@@ -105,7 +109,9 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | Styling | Tailwind CSS |
 | State | Zustand (with localStorage persistence) |
 | Icons | Lucide React |
-| AI | Anthropic API — direct browser calls |
+| AI | OpenRouter API — 100+ models, free tier available |
+| PDF parsing | PDF.js (pdfjs-dist) — client-side text extraction |
+| Markdown | react-markdown + remark-gfm |
 
 ---
 
@@ -118,7 +124,7 @@ The prototype was designed against 15 user requirements derived from our researc
 | #1 — Source citations | Inline citation prompt in every chat |
 | #8 — Save outputs | "Save to Notes" on every AI message |
 | #9 — Retrieve saved outputs | Notes windows, persistent across reload |
-| #10 — Multimodal input | PDF upload → Claude document API |
+| #10 — Multimodal input | PDF upload → client-side text extraction → any free model |
 | #11 — Persistent constraints | Project Requirements modal, injected as system prompt |
 | #12 — Audit trail | Response Auditor window |
 | #13 — Multiple workspaces | Each sign-in session is its own project |
