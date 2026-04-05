@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, BookmarkPlus, ShieldCheck, Pencil, Check, X } from 'lucide-react'
+import { Send, BookmarkPlus, ShieldCheck, Pencil, Check, X, RefreshCw } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useStore } from '../../store'
 import { sendChat } from '../../services/ai'
 import Window from '../Window'
@@ -7,18 +9,21 @@ import type { ChatMsg } from '../../types'
 
 const uid = () => `m${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
+const isError = (content: string) => content.trimStart().startsWith('⚠️')
+
 export default function ChatWindow({ wid }: { wid: string }) {
-  const win         = useStore(s => s.windows.find(w => w.id === wid))
-  const addMsg      = useStore(s => s.addMsg)
-  const appendMsg   = useStore(s => s.appendMsg)
-  const setLoading  = useStore(s => s.setLoading)
+  const win          = useStore(s => s.windows.find(w => w.id === wid))
+  const addMsg       = useStore(s => s.addMsg)
+  const appendMsg    = useStore(s => s.appendMsg)
+  const setLoading   = useStore(s => s.setLoading)
   const updateWindow = useStore(s => s.updateWindow)
   const requirements = useStore(s => s.requirements)
-  const apiKey      = useStore(s => s.apiKey)
-  const addWindow   = useStore(s => s.addWindow)
-  const windows     = useStore(s => s.windows)
+  const apiKey       = useStore(s => s.apiKey)
+  const chatModel    = useStore(s => s.chatModel)
+  const addWindow    = useStore(s => s.addWindow)
+  const windows      = useStore(s => s.windows)
 
-  const [input, setInput] = useState('')
+  const [input, setInput]       = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -34,36 +39,53 @@ export default function ChatWindow({ wid }: { wid: string }) {
   const messageCount = win.messages?.filter(m => m.role === 'user').length ?? 0
   const title = `Chat${messageCount > 0 ? ` — ${messageCount} exchange${messageCount !== 1 ? 's' : ''}` : ''}`
 
+  // Core send — takes an explicit message list so retry can pass its own snapshot
+  const runSend = async (apiMessages: { role: 'user' | 'assistant'; content: string }[]) => {
+    addMsg(wid, { id: uid(), role: 'assistant', content: '', ts: Date.now() })
+    setLoading(wid, true)
+    try {
+      if (!apiKey) {
+        await new Promise(r => setTimeout(r, 400))
+        appendMsg(wid, '⚠️ No API key configured. Click ⚙ Settings in the top-right to add your OpenRouter API key.')
+      } else {
+        await sendChat(apiMessages, requirements, apiKey, chatModel, chunk => appendMsg(wid, chunk))
+      }
+    } catch (err) {
+      appendMsg(wid, `⚠️ Error: ${(err as Error).message}`)
+    } finally {
+      setLoading(wid, false)
+    }
+  }
+
   const send = async () => {
     const text = input.trim()
     if (!text || win.loading) return
     setInput('')
 
-    // Snapshot messages before mutations for API call
     const priorMessages = win.messages ?? []
     const userMsg: ChatMsg = { id: uid(), role: 'user', content: text, ts: Date.now() }
-
     addMsg(wid, userMsg)
-    addMsg(wid, { id: uid(), role: 'assistant', content: '', ts: Date.now() })
-    setLoading(wid, true)
 
     const apiMessages = [...priorMessages, userMsg].map(m => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }))
+    await runSend(apiMessages)
+  }
 
-    try {
-      if (!apiKey) {
-        await new Promise(r => setTimeout(r, 600))
-        appendMsg(wid, '⚠️ No API key configured. Click the ⚙ Settings icon in the top-right to add your Anthropic API key.')
-      } else {
-        await sendChat(apiMessages, requirements, apiKey, (chunk) => appendMsg(wid, chunk))
-      }
-    } catch (err) {
-      appendMsg(wid, `\n\n⚠️ Error: ${(err as Error).message}`)
-    } finally {
-      setLoading(wid, false)
-    }
+  // Retry: remove the last (failed) assistant message, then re-run with history up to the last user msg
+  const retry = async (assistantMsgId: string) => {
+    if (win.loading) return
+    const msgs = win.messages ?? []
+    const withoutFailed = msgs.filter(m => m.id !== assistantMsgId)
+    updateWindow(wid, { messages: withoutFailed })
+
+    // Build API history: all messages excluding the failed assistant reply
+    const apiMessages = withoutFailed.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }))
+    await runSend(apiMessages)
   }
 
   const saveToNotes = (content: string) => {
@@ -81,7 +103,8 @@ export default function ChatWindow({ wid }: { wid: string }) {
     addWindow('auditor', {
       auditContent: content,
       auditQuery: query,
-      pos: { x: (win.pos.x) + win.size.width + 20, y: win.pos.y },
+      auditPrimaryModel: chatModel,
+      pos: { x: win.pos.x + win.size.width + 20, y: win.pos.y },
     })
   }
 
@@ -117,7 +140,9 @@ export default function ChatWindow({ wid }: { wid: string }) {
                 className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-indigo-600 text-white rounded-tr-sm'
-                    : 'bg-gray-50 border border-gray-200 text-gray-800 rounded-tl-sm'
+                    : isError(msg.content)
+                      ? 'bg-red-50 border border-red-200 text-red-700 rounded-tl-sm'
+                      : 'bg-gray-50 border border-gray-200 text-gray-800 rounded-tl-sm'
                 }`}
               >
                 {/* Typing indicator */}
@@ -142,6 +167,30 @@ export default function ChatWindow({ wid }: { wid: string }) {
                     rows={4}
                     autoFocus
                   />
+                ) : msg.role === 'assistant' ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800 break-all">
+                          {children}
+                        </a>
+                      ),
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                      code: ({ children }) => <code className="bg-gray-100 text-gray-800 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+                      pre: ({ children }) => <pre className="bg-gray-100 rounded p-2 text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+                      h1: ({ children }) => <h1 className="font-bold text-base mb-1">{children}</h1>,
+                      h2: ({ children }) => <h2 className="font-bold text-sm mb-1">{children}</h2>,
+                      h3: ({ children }) => <h3 className="font-semibold text-sm mb-1">{children}</h3>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 ) : (
                   <span className="whitespace-pre-wrap">{msg.content}</span>
                 )}
@@ -167,30 +216,49 @@ export default function ChatWindow({ wid }: { wid: string }) {
                     </>
                   ) : (
                     <>
+                      {/* Retry — always shown, prominent on errors */}
                       <button
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-600 transition-colors"
-                        onClick={() => saveToNotes(msg.content)}
-                        title="Save to notes"
+                        className={`flex items-center gap-1 text-xs transition-colors ${
+                          isError(msg.content)
+                            ? 'text-red-500 hover:text-red-700 font-medium'
+                            : 'text-gray-400 hover:text-indigo-600'
+                        }`}
+                        onClick={() => retry(msg.id)}
+                        disabled={!!win.loading}
+                        title="Retry this response"
                       >
-                        <BookmarkPlus size={11} /> Notes
+                        <RefreshCw size={11} /> Retry
                       </button>
-                      <button
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 transition-colors"
-                        onClick={() => {
-                          const query = win.messages?.[i - 1]?.content ?? ''
-                          openAuditor(msg.content, query)
-                        }}
-                        title="Audit this response"
-                      >
-                        <ShieldCheck size={11} /> Audit
-                      </button>
-                      <button
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
-                        onClick={() => { setEditingId(msg.id); setEditText(msg.content) }}
-                        title="Edit response"
-                      >
-                        <Pencil size={11} /> Edit
-                      </button>
+
+                      {/* Other actions — only on non-error responses */}
+                      {!isError(msg.content) && (
+                        <>
+                          <button
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-600 transition-colors"
+                            onClick={() => saveToNotes(msg.content)}
+                            title="Save to notes"
+                          >
+                            <BookmarkPlus size={11} /> Notes
+                          </button>
+                          <button
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 transition-colors"
+                            onClick={() => {
+                              const query = win.messages?.[i - 1]?.content ?? ''
+                              openAuditor(msg.content, query)
+                            }}
+                            title="Audit this response"
+                          >
+                            <ShieldCheck size={11} /> Audit
+                          </button>
+                          <button
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+                            onClick={() => { setEditingId(msg.id); setEditText(msg.content) }}
+                            title="Edit response"
+                          >
+                            <Pencil size={11} /> Edit
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
