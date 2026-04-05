@@ -62,8 +62,8 @@ export async function fetchFreeModels(): Promise<ModelOption[]> {
   }
 
   return data.data
+    .filter(m => m.pricing.prompt === '0' && m.pricing.completion === '0')
     .map(m => {
-      const isFree = m.pricing.prompt === '0' && m.pricing.completion === '0'
       const provider = m.id.split('/')[0] ?? ''
       const ctx = m.context_length
       const ctxLabel = ctx >= 1_000_000
@@ -78,14 +78,10 @@ export async function fetchFreeModels(): Promise<ModelOption[]> {
         context: ctx,
         contextLabel: ctxLabel,
         description: m.description ?? '',
-        isFree,
+        isFree: true,
       }
     })
-    // Free models first, then alphabetical within each group
-    .sort((a, b) => {
-      if (a.isFree !== b.isFree) return a.isFree ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 function capitalise(s: string) {
