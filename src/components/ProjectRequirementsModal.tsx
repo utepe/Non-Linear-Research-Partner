@@ -15,7 +15,7 @@ export default function ProjectRequirementsModal({ onClose }: { onClose: () => v
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 99999 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-[520px] flex flex-col max-h-[90vh]">

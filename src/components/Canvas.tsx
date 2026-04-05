@@ -27,7 +27,7 @@ export default function Canvas() {
     <div className="flex-1 overflow-auto" style={{ background: '#F0F2F7' }}>
       {/* Dot-grid canvas */}
       <div
-        className="relative select-none"
+        className="relative"
         style={{
           width: 4000,
           height: 3000,

@@ -102,7 +102,7 @@ export default function Window({ id, title, children, titleActions }: Props) {
     >
       {/* Title bar */}
       <div
-        className="flex items-center px-3 py-2 shrink-0 cursor-grab active:cursor-grabbing gap-2"
+        className="flex items-center px-3 py-2 shrink-0 cursor-grab active:cursor-grabbing gap-2 select-none"
         style={{
           background: colors.header,
           borderBottom: `1px solid ${colors.border}`,
