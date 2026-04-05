@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { RefreshCw, ShieldCheck } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useStore } from '../../store'
 import { auditResponse } from '../../services/ai'
 import Window from '../Window'
@@ -24,14 +26,19 @@ export default function AuditorWindow({ wid }: { wid: string }) {
 
     try {
       const primaryModel = win.auditPrimaryModel ?? 'unknown'
-      const result = await auditResponse(
+      let accumulated = ''
+      await auditResponse(
         win.auditQuery ?? '',
         win.auditContent,
         primaryModel,
         apiKey,
         auditorModel,
+        chunk => {
+          accumulated += chunk
+          updateWindow(wid, { auditResult: accumulated })
+        },
       )
-      updateWindow(wid, { auditResult: result, auditLoading: false })
+      updateWindow(wid, { auditLoading: false })
     } catch (err) {
       updateWindow(wid, {
         auditResult: `Audit error: ${(err as Error).message}`,
@@ -123,8 +130,29 @@ export default function AuditorWindow({ wid }: { wid: string }) {
                 <RefreshCw size={11} /> Re-run
               </button>
             </div>
-            <div className="text-sm text-gray-700 bg-purple-50 rounded-xl p-3 border border-purple-100 whitespace-pre-wrap leading-relaxed">
-              {win.auditResult}
+            <div className="text-sm text-gray-700 bg-purple-50 rounded-xl p-3 border border-purple-100 leading-relaxed">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ href, children }) => (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="underline text-purple-600 hover:text-purple-800 break-all">
+                      {children}
+                    </a>
+                  ),
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  em: ({ children }) => <em className="italic">{children}</em>,
+                  code: ({ children }) => <code className="bg-purple-100 text-purple-800 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+                  h1: ({ children }) => <h1 className="font-bold text-base mb-1">{children}</h1>,
+                  h2: ({ children }) => <h2 className="font-bold text-sm mb-1">{children}</h2>,
+                  h3: ({ children }) => <h3 className="font-semibold text-sm mb-1">{children}</h3>,
+                }}
+              >
+                {win.auditResult}
+              </ReactMarkdown>
             </div>
           </div>
         )}

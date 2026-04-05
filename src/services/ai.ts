@@ -41,8 +41,14 @@ async function callOpenRouter(
   })
 
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({})) as { error?: { message?: string } }
-    throw new Error(err.error?.message ?? `HTTP ${resp.status}`)
+    const err = await resp.json().catch(() => ({})) as {
+      error?: { message?: string; code?: number; metadata?: { raw?: string; provider_name?: string } }
+    }
+    const msg = err.error?.message ?? `HTTP ${resp.status}`
+    const provider = err.error?.metadata?.provider_name
+    const raw = err.error?.metadata?.raw
+    const detail = [provider && `(${provider})`, raw && `— ${raw}`].filter(Boolean).join(' ')
+    throw new Error(detail ? `${msg} ${detail}` : msg)
   }
 
   if (!stream) {
@@ -124,17 +130,40 @@ export async function summarizePdf(
   )
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '[code block]') // fenced code blocks
+    .replace(/`[^`]+`/g, '[code]')              // inline code
+    .replace(/!\[.*?\]\(.*?\)/g, '[image]')      // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')     // links → label only
+    .replace(/^#{1,6}\s+/gm, '')                 // headings
+    .replace(/\*\*([^*]+)\*\*/g, '$1')           // bold
+    .replace(/\*([^*]+)\*/g, '$1')               // italic
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')       // underscore bold/italic
+    .replace(/^\s*[-*+]\s+/gm, '• ')             // bullet lists
+    .replace(/^\s*\d+\.\s+/gm, '')               // numbered lists
+    .replace(/\n{3,}/g, '\n\n')                  // collapse blank lines
+    .trim()
+}
+
 export async function auditResponse(
   query: string,
   aiResponse: string,
   primaryModel: string,
   apiKey: string,
   auditorModel: string,
+  onChunk?: (t: string) => void,
 ): Promise<string> {
+  const stripped = stripMarkdown(aiResponse)
+  const truncatedResponse = stripped.length > 2000
+    ? stripped.slice(0, 2000) + '\n\n[Response truncated]'
+    : stripped
+  const truncatedQuery = query.length > 500 ? query.slice(0, 500) + '…' : query
+
   const messages: ApiMsg[] = [
     {
       role: 'user',
-      content: `**Chat model evaluated:** ${primaryModel}\n**Research Query:** ${query || '(none provided)'}\n\n**Response to evaluate:**\n${aiResponse}\n\nProvide a structured assessment:\n1. **Factual Accuracy** — potential inaccuracies or hallucinations\n2. **Completeness** — important aspects missing\n3. **Confidence Level** — High / Medium / Low with reasoning\n4. **Verification Recommendations** — what the researcher should independently verify`,
+      content: `Chat model evaluated: ${primaryModel}\nResearch Query: ${truncatedQuery || '(none provided)'}\n\nResponse to evaluate:\n${truncatedResponse}\n\nProvide a structured assessment:\n1. Factual Accuracy — potential inaccuracies or hallucinations\n2. Completeness — important aspects missing\n3. Confidence Level — High / Medium / Low with reasoning\n4. Verification Recommendations — what the researcher should independently verify`,
     },
   ]
 
@@ -143,5 +172,6 @@ export async function auditResponse(
     'You are a critical independent evaluator of AI-generated academic content. Be direct, specific, and constructive.',
     apiKey,
     auditorModel,
+    onChunk,
   )
 }
