@@ -52,7 +52,7 @@ function ModelSelect({ label, hint, value, onChange, models, badge }: ModelSelec
       >
         {models.map(m => (
           <option key={m.id} value={m.id}>
-            {m.name} — {m.provider} · {m.contextLabel} ctx
+            {m.isFree ? '✦ ' : ''}{m.name} — {m.provider} · {m.contextLabel} ctx{m.isFree ? ' (free)' : ''}
           </option>
         ))}
         <option disabled>────────────</option>
@@ -193,7 +193,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 )}
                 {!loadingModels && models.length > 0 && (
                   <span className="ml-2 text-gray-400 font-normal normal-case">
-                    {models.length} free models
+                    {models.length} models ({models.filter(m => m.isFree).length} free)
                   </span>
                 )}
               </p>

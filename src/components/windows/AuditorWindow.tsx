@@ -1,16 +1,38 @@
-import { useEffect } from 'react'
-import { RefreshCw, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { RefreshCw, ShieldCheck, BookmarkPlus } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useStore } from '../../store'
 import { auditResponse } from '../../services/ai'
+import { FALLBACK_MODELS, fetchFreeModels, type ModelOption } from '../../models'
 import Window from '../Window'
 
 export default function AuditorWindow({ wid }: { wid: string }) {
   const win          = useStore(s => s.windows.find(w => w.id === wid))
   const updateWindow = useStore(s => s.updateWindow)
   const apiKey       = useStore(s => s.apiKey)
-  const auditorModel = useStore(s => s.auditorModel)
+  const auditorModel    = useStore(s => s.auditorModel)
+  const setAuditorModel = useStore(s => s.setAuditorModel)
+  const windows         = useStore(s => s.windows)
+  const addWindow       = useStore(s => s.addWindow)
+
+  const [models, setModels] = useState<ModelOption[]>(FALLBACK_MODELS)
+
+  useEffect(() => {
+    fetchFreeModels().then(list => { if (list.length > 0) setModels(list) }).catch(() => {})
+  }, [])
+
+  const saveToNotes = (content: string) => {
+    const notesWin = windows.find(w => w.type === 'notes')
+    if (notesWin) {
+      updateWindow(notesWin.id, {
+        noteText: (notesWin.noteText ?? '') + '\n\n---\n' + content,
+        notePreview: true,
+      })
+    } else {
+      addWindow('notes', { noteText: content, notePreview: true })
+    }
+  }
 
   const runAudit = async () => {
     if (!win?.auditContent) return
@@ -68,22 +90,44 @@ export default function AuditorWindow({ wid }: { wid: string }) {
     <Window id={wid} title="Response Auditor">
       <div className="p-4 h-full overflow-y-auto flex flex-col gap-4">
 
-        {/* Model badges */}
+        {/* Model badges + auditor selector */}
         {win.auditContent && (
-          <div className="flex flex-wrap gap-2">
-            {primaryModelName && (
-              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100">
-                Chat: {primaryModelName}
-              </span>
-            )}
-            <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-lg border border-purple-100">
-              Auditor: {auditorModelName}
-            </span>
-            {sameModel && (
-              <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-lg border border-amber-100">
-                ⚠ Same model
-              </span>
-            )}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              {primaryModelName && (
+                <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100">
+                  Chat: {primaryModelName}
+                </span>
+              )}
+              {sameModel && (
+                <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-lg border border-amber-100">
+                  ⚠ Same model
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-purple-600 shrink-0">Auditor:</span>
+              <select
+                value={auditorModel}
+                onChange={e => { setAuditorModel(e.target.value); updateWindow(wid, { auditResult: '', auditLoading: false }) }}
+                className="flex-1 text-xs border border-purple-200 rounded-lg px-2 py-1 bg-purple-50 text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+              >
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>{m.name} — {m.provider}</option>
+                ))}
+                {!FALLBACK_MODELS.find(m => m.id === auditorModel) && (
+                  <option value={auditorModel}>{auditorModelName}</option>
+                )}
+              </select>
+              <button
+                onClick={runAudit}
+                disabled={!!win.auditLoading}
+                className="text-xs text-purple-500 hover:text-purple-700 disabled:opacity-40 transition-colors shrink-0"
+                title="Re-run with selected model"
+              >
+                <RefreshCw size={12} className={win.auditLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -123,12 +167,21 @@ export default function AuditorWindow({ wid }: { wid: string }) {
                 <ShieldCheck size={12} className="text-purple-500" />
                 Audit Results
               </p>
-              <button
-                onClick={runAudit}
-                className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1 transition-colors"
-              >
-                <RefreshCw size={11} /> Re-run
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => saveToNotes(win.auditResult!)}
+                  className="text-xs text-gray-400 hover:text-amber-600 flex items-center gap-1 transition-colors"
+                  title="Save to notes"
+                >
+                  <BookmarkPlus size={11} /> Notes
+                </button>
+                <button
+                  onClick={runAudit}
+                  className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1 transition-colors"
+                >
+                  <RefreshCw size={11} /> Re-run
+                </button>
+              </div>
             </div>
             <div className="text-sm text-gray-700 bg-purple-50 rounded-xl p-3 border border-purple-100 leading-relaxed">
               <ReactMarkdown

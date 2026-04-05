@@ -43,7 +43,7 @@ export const FALLBACK_MODELS: ModelOption[] = [
 export const DEFAULT_CHAT_MODEL    = FALLBACK_MODELS[0].id
 export const DEFAULT_AUDITOR_MODEL = FALLBACK_MODELS[1].id
 
-// Fetch live free model list from OpenRouter.
+// Fetch all models from OpenRouter (free + paid).
 // No auth required for the models endpoint.
 export async function fetchFreeModels(): Promise<ModelOption[]> {
   const resp = await fetch('https://openrouter.ai/api/v1/models', {
@@ -62,8 +62,8 @@ export async function fetchFreeModels(): Promise<ModelOption[]> {
   }
 
   return data.data
-    .filter(m => m.pricing.prompt === '0' && m.pricing.completion === '0')
     .map(m => {
+      const isFree = m.pricing.prompt === '0' && m.pricing.completion === '0'
       const provider = m.id.split('/')[0] ?? ''
       const ctx = m.context_length
       const ctxLabel = ctx >= 1_000_000
@@ -78,11 +78,14 @@ export async function fetchFreeModels(): Promise<ModelOption[]> {
         context: ctx,
         contextLabel: ctxLabel,
         description: m.description ?? '',
-        isFree: true,
+        isFree,
       }
     })
-    // Sort by context length descending, then name
-    .sort((a, b) => b.context - a.context || a.name.localeCompare(b.name))
+    // Free models first, then alphabetical within each group
+    .sort((a, b) => {
+      if (a.isFree !== b.isFree) return a.isFree ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
 }
 
 function capitalise(s: string) {

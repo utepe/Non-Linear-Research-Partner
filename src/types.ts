@@ -33,6 +33,8 @@ export interface AppWindow {
   loading?: boolean
   // notes
   noteText?: string
+  notePreview?: boolean
+  noteSplit?: boolean
   // pdf
   pdfName?: string
   pdfSummary?: string

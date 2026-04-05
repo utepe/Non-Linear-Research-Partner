@@ -66,10 +66,11 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - **Edit Response** — click the pencil icon to correct or annotate any AI message in place
 
 ### Notes Windows
-- Freeform text editor alongside your AI chats
-- Word count shown in the footer
-- Copy-all button for easy export
-- Content from "Save to Notes" is appended with a separator
+- Freeform markdown editor alongside your AI chats
+- Formatting toolbar: bold, italic, bullet list, numbered list, divider (also via ⌘B / ⌘I shortcuts)
+- Three view modes: **Edit**, **Split** (editor + live preview side by side), **Preview only** — toggled with the toolbar button
+- Content saved from "Save to Notes" auto-switches to preview mode so formatting renders immediately
+- Word count shown in the footer; copy-all button for easy export
 
 ### PDF Upload & Summarization
 - Upload any PDF from your file system
@@ -91,7 +92,8 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - Triggered from any AI message via the "Audit" button
 - Uses a **separate, independently-configured model** (not the same one that wrote the response) for a genuinely independent evaluation
 - Evaluates: factual accuracy, completeness, confidence level, and what to verify independently
-- The evaluated model name is shown in the auditor window header
+- **Inline model selector** — change the auditor model directly in the window without opening Settings; fetches the full live model list from OpenRouter
+- Audit results rendered as formatted markdown; save directly to Notes with one click
 
 ### Project Requirements
 - Defined once per session in the top bar

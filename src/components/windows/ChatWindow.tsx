@@ -93,9 +93,10 @@ export default function ChatWindow({ wid }: { wid: string }) {
     if (notesWin) {
       updateWindow(notesWin.id, {
         noteText: (notesWin.noteText ?? '') + '\n\n---\n' + content,
+        notePreview: true,
       })
     } else {
-      addWindow('notes', { noteText: content })
+      addWindow('notes', { noteText: content, notePreview: true })
     }
   }
 
