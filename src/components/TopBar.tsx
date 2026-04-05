@@ -40,7 +40,7 @@ export default function TopBar() {
             onClick={() => setShowSettings(true)}
             className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg hover:bg-amber-100 transition-colors"
           >
-            ⚠ No API key
+            ⚠ No OpenRouter key
           </button>
         )}
 

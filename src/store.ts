@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AppWindow, WindowType, ChatMsg, CheckItem, Ref } from './types'
+import type { AppWindow, WindowType, ChatMsg, Ref } from './types'
+import { DEFAULT_CHAT_MODEL, DEFAULT_AUDITOR_MODEL } from './models'
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -10,7 +11,7 @@ const DEFAULT_SIZES: Record<WindowType, { width: number; height: number }> = {
   pdf:        { width: 320, height: 300 },
   checklist:  { width: 270, height: 310 },
   references: { width: 350, height: 340 },
-  auditor:    { width: 420, height: 400 },
+  auditor:    { width: 420, height: 420 },
 }
 
 interface Store {
@@ -20,7 +21,10 @@ interface Store {
   projectName: string
   // Project
   requirements: string
+  // OpenRouter
   apiKey: string
+  chatModel: string
+  auditorModel: string
   // Canvas
   windows: AppWindow[]
   // Global references list
@@ -30,6 +34,8 @@ interface Store {
   signOut: () => void
   setRequirements: (r: string) => void
   setApiKey: (k: string) => void
+  setChatModel: (m: string) => void
+  setAuditorModel: (m: string) => void
 
   addWindow: (type: WindowType, overrides?: Partial<AppWindow>) => string
   removeWindow: (wid: string) => void
@@ -57,6 +63,8 @@ export const useStore = create<Store>()(
       projectName: '',
       requirements: '',
       apiKey: '',
+      chatModel: DEFAULT_CHAT_MODEL,
+      auditorModel: DEFAULT_AUDITOR_MODEL,
       windows: [],
       refs: [],
 
@@ -64,6 +72,8 @@ export const useStore = create<Store>()(
       signOut: () => set({ isSignedIn: false, windows: [] }),
       setRequirements: (r) => set({ requirements: r }),
       setApiKey: (k) => set({ apiKey: k }),
+      setChatModel: (m) => set({ chatModel: m }),
+      setAuditorModel: (m) => set({ auditorModel: m }),
 
       addWindow: (type, overrides = {}) => {
         const existing = get().windows
@@ -166,8 +176,7 @@ export const useStore = create<Store>()(
         const { windows, ...rest } = s
         return {
           ...rest,
-          // Don't persist large PDF base64 blobs
-          windows: windows.map(({ pdfBase64: _omit, ...w }) => w),
+          windows,
         }
       },
     }

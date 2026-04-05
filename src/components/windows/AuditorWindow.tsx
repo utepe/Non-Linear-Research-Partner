@@ -8,6 +8,7 @@ export default function AuditorWindow({ wid }: { wid: string }) {
   const win          = useStore(s => s.windows.find(w => w.id === wid))
   const updateWindow = useStore(s => s.updateWindow)
   const apiKey       = useStore(s => s.apiKey)
+  const auditorModel = useStore(s => s.auditorModel)
 
   const runAudit = async () => {
     if (!win?.auditContent) return
@@ -16,13 +17,20 @@ export default function AuditorWindow({ wid }: { wid: string }) {
     if (!apiKey) {
       updateWindow(wid, {
         auditLoading: false,
-        auditResult: 'Configure an API key in Settings to run the response auditor.',
+        auditResult: 'Configure an OpenRouter API key in Settings to run the response auditor.',
       })
       return
     }
 
     try {
-      const result = await auditResponse(win.auditQuery ?? '', win.auditContent, apiKey)
+      const primaryModel = win.auditPrimaryModel ?? 'unknown'
+      const result = await auditResponse(
+        win.auditQuery ?? '',
+        win.auditContent,
+        primaryModel,
+        apiKey,
+        auditorModel,
+      )
       updateWindow(wid, { auditResult: result, auditLoading: false })
     } catch (err) {
       updateWindow(wid, {
@@ -42,10 +50,37 @@ export default function AuditorWindow({ wid }: { wid: string }) {
 
   if (!win) return null
 
+  const slugToName = (id: string) =>
+    id.split('/').pop()?.replace(':free', '').replace(/-/g, ' ') ?? id
+
+  const primaryModelName = win.auditPrimaryModel ? slugToName(win.auditPrimaryModel) : null
+  const auditorModelName = slugToName(auditorModel)
+  const sameModel = win.auditPrimaryModel === auditorModel
+
   return (
     <Window id={wid} title="Response Auditor">
       <div className="p-4 h-full overflow-y-auto flex flex-col gap-4">
-        {/* Original response */}
+
+        {/* Model badges */}
+        {win.auditContent && (
+          <div className="flex flex-wrap gap-2">
+            {primaryModelName && (
+              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100">
+                Chat: {primaryModelName}
+              </span>
+            )}
+            <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-lg border border-purple-100">
+              Auditor: {auditorModelName}
+            </span>
+            {sameModel && (
+              <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-lg border border-amber-100">
+                ⚠ Same model
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Original response preview */}
         {win.auditContent && (
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
@@ -68,7 +103,7 @@ export default function AuditorWindow({ wid }: { wid: string }) {
             <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-purple-600 font-medium">Running independent audit…</p>
             <p className="text-xs text-gray-400 text-center max-w-[240px]">
-              A second AI model is evaluating the accuracy and completeness of this response.
+              {auditorModelName} is independently evaluating this response.
             </p>
           </div>
         )}
@@ -105,7 +140,7 @@ export default function AuditorWindow({ wid }: { wid: string }) {
           </div>
         )}
 
-        {/* Manual trigger if not started */}
+        {/* Manual trigger */}
         {win.auditContent && !win.auditResult && !win.auditLoading && (
           <button
             onClick={runAudit}

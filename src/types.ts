@@ -37,7 +37,7 @@ export interface AppWindow {
   pdfName?: string
   pdfSummary?: string
   pdfLoading?: boolean
-  pdfBase64?: string
+  pdfText?: string   // extracted plain text — works with all models
   // checklist (items stored at top-level)
   items?: CheckItem[]
   // auditor
@@ -45,4 +45,5 @@ export interface AppWindow {
   auditQuery?: string
   auditResult?: string
   auditLoading?: boolean
+  auditPrimaryModel?: string
 }
